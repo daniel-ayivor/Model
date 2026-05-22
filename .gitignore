@@ -35,4 +35,3 @@ uploads/
 # Large Trained Model Weights Checkpoints (Keep these local or use Git LFS)
 *.pth
 *.pkl
-*.h5
