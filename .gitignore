@@ -1,0 +1,38 @@
+# # Dataset
+# plant_datasets/
+
+# # Trained models
+# *.pth
+
+# # Python cache
+# __pycache__/
+# *.pyc
+
+# # Virtual environment
+# .venv/
+
+# # Environment variables
+# .env
+
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python caching
+__pycache__/
+*.pyc
+
+# Environmental Configurations
+.env
+
+# Massive Image Datasets (Block the raw, processed, and collapsed folders)
+plant_datasets/
+uploads/
+
+# Large Trained Model Weights Checkpoints (Keep these local or use Git LFS)
+*.pth
+*.pkl
+*.h5
