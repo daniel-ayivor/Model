@@ -1,6 +1,9 @@
+fastapi
+uvicorn
+gunicorn
 torch
 torchvision
-Pillow
 numpy
-fastapi
-gunicorn
+pillow
+python-multipart
+opencv-python-headless
