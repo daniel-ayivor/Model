@@ -3,6 +3,7 @@ from PIL import Image, ImageFile
 
 # Force Pillow to be lenient with minor stream errors if possible, 
 # but we still want to delete files that completely crash the loader.
+# added gunicorn to handle truncated images gracefully, but we will still remove files that fail to load entirely.
 ImageFile.LOAD_TRUNCATED_IMAGES = False 
 
 def aggressive_dataset_cleaner(root_dir):
