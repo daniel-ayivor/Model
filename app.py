@@ -49,9 +49,25 @@ num_classes = len(class_names)
 
 print(f"Loaded model with {num_classes} classes: {class_names}")
 
+# model = models.resnet18(weights=None)
+# model.fc = nn.Linear(model.fc.in_features, num_classes)
+# model.load_state_dict(checkpoint['model_state_dict'])
+# model.eval()
+
+
 model = models.resnet18(weights=None)
 model.fc = nn.Linear(model.fc.in_features, num_classes)
-model.load_state_dict(checkpoint['model_state_dict'])
+
+# Extract weights correctly whether wrapped in a key or saved raw
+if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+    state_dict = checkpoint['model_state_dict']
+elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+    state_dict = checkpoint['state_dict']
+else:
+    # If the file IS the raw state dict itself
+    state_dict = checkpoint
+
+model.load_state_dict(state_dict)
 model.eval()
 
 # =========================
