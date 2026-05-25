@@ -33,5 +33,9 @@ plant_datasets/
 uploads/
 
 # Large Trained Model Weights Checkpoints (Keep these local or use Git LFS)
+# Large Trained Model Weights Checkpoints
 *.pth
 *.pkl
+
+# Explicit exceptions - Allow tracking for production weights
+!plant_symptom_model.pth

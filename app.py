@@ -24,7 +24,8 @@ if not os.path.exists(UPLOAD_DIR):
 # Class names and num_classes are read directly from the saved model
 # so this never breaks if you retrain with different classes
 # =========================
-MODEL_PATH = "crop_identifier_best.pth"
+# MODEL_PATH = "# Change this line:
+MODEL_PATH = "plant_symptom_model.pth"
 IMAGE_SIZE = 224
 
 checkpoint = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
