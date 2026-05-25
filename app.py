@@ -28,25 +28,30 @@ if not os.path.exists(UPLOAD_DIR):
 MODEL_PATH = "plant_symptom_model.pth"
 IMAGE_SIZE = 224
 
+# checkpoint = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
+# class_names = checkpoint['class_names']
+# num_classes = len(class_names)
+
+
 checkpoint = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
 
-# Define class names directly in the app
-class_names = [
-    'Cashew anthracnose', 'Cashew gumosis', 'Cashew healthy', 'Cashew leaf miner', 'Cashew red rust',
-    'Cassava bacterial blight', 'Cassava brown spot', 'Cassava green mite', 'Cassava healthy', 'Cassava mosaic',
-    'Maize fall armyworm', 'Maize grasshoper', 'Maize healthy', 'Maize leaf beetle', 'Maize leaf blight',
-    'Maize leaf spot', 'Maize streak virus', 'Rice brown spot', 'Rice healthy', 'Rice hispa', 'Rice leaf blast',
-    'Tomato bacterial spot', 'Tomato early blight', 'Tomato healthy', 'Tomato late blight', 'Tomato leaf curl',
-    'Tomato mosaic virus', 'Tomato septoria leaf spot', 'Tomato target spot', 'Tomato verticulium wilt'
-]
+# Fallback block if 'class_names' key is missing from the trained dictionary
+if 'class_names' in checkpoint:
+    class_names = checkpoint['class_names']
+else:
+    class_names = [
+        'Anthracnose', 'Armyworm', 'Beetle', 'Blight', 'Curl_Virus', 
+        'Grasshopper', 'Gumosis', 'Healthy', 'Leaf_Miner', 'Leaf_Spot', 
+        'Mites', 'Mosaic_Virus', 'Rust', 'Streak_Virus', 'Sudden_Death', 'Wilt'
+    ]
+
 num_classes = len(class_names)
 
 print(f"Loaded model with {num_classes} classes: {class_names}")
 
 model = models.resnet18(weights=None)
 model.fc = nn.Linear(model.fc.in_features, num_classes)
-# Load only the model's state dictionary
-model.load_state_dict(checkpoint)
+model.load_state_dict(checkpoint['model_state_dict'])
 model.eval()
 
 # =========================
