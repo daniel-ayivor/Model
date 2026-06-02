@@ -1,78 +1,325 @@
+# import os
+# import io
+# import torch
+# import torch.nn as nn
+# import uvicorn
+# from fastapi import FastAPI, File, UploadFile
+# from fastapi.responses import JSONResponse
+# from PIL import Image
+# from torchvision import transforms, models
+# from knowledge_base import disease_info
+
+# app = FastAPI()
+
+# # Create a directory for user upload logs if it doesn't exist
+# UPLOAD_DIR = "uploads"
+# os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# # ==========================================
+# # 🧠 DYNAMIC MODEL PATH & LIFECYCLE LOADER
+# # ==========================================
+# # ==========================================
+# # 🧠 DYNAMIC MODEL PATH & LIFECYCLE LOADER
+# # ==========================================
+# MODEL_PATH = "plant_disease_model.pth"
+# IMAGE_SIZE = 224
+
+# # The 55 clean, lowercase classes matching your folder structure exactly
+# WARMIGRO_CLASSES = [
+#     'apple_apple_scab', 'apple_black_rot', 'apple_cedar_apple_rust', 'apple_healthy',
+#     'cashew_anthracnose', 'cashew_gumosis', 'cashew_healthy', 'cashew_leaf_miner', 'cashew_red_rust',
+#     'cassava_bacterial_blight', 'cassava_brown_spot', 'cassava_green_mite', 'cassava_healthy', 'cassava_mosaic',
+#     'maize_cercospora_leaf_spot_gray_leaf_spot', 'maize_common_rust', 'maize_fall_armyworm', 'maize_grasshoper',
+#     'maize_healthy', 'maize_leaf_beetle', 'maize_leaf_blight', 'maize_leaf_spot', 'maize_northern_leaf_blight',
+#     'maize_streak_virus', 'mossaic_virus', 'pepper_bacterial_spot', 'pepper_healthy',
+#     'potato_early_blight', 'potato_healthy', 'potato_late_blight', 'rice_leafs', 'southern_blight',
+#     'sudden_death_syndrone', 'tomato_bacterial_spot', 'tomato_early_blight', 'tomato_healthy',
+#     'tomato_late_blight', 'tomato_leaf_blight', 'tomato_leaf_curl', 'tomato_leaf_mold',
+#     'tomato_mosaic_virus', 'tomato_septoria_leaf_spot', 'tomato_spider_mites_two_spotted_spider_mite',
+#     'tomato_target_spot', 'tomato_tomato_mosaic_virus', 'tomato_tomato_yellow_leaf_curl_virus',
+#     'tomato_tomato_yellowleaf_curl_virus', 'tomato_verticulium_wilt', 'yellow_mosaic'
+# ]
+
+# if not os.path.exists(MODEL_PATH):
+#     print(f"Checkpoint '{MODEL_PATH}' not found. Booting with dummy placeholders...")
+#     class_names = WARMIGRO_CLASSES
+#     num_classes = len(class_names)
+#     model = models.resnet18(weights=None)
+#     model.fc = nn.Linear(model.fc.in_features, num_classes)
+#     model.eval()
+# else:
+#     print(f"Loading weights from '{MODEL_PATH}'...")
+#     checkpoint = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
+
+#     # If the file has embedded classes, use them. Otherwise, fall back to our clean list!
+#     if isinstance(checkpoint, dict) and 'class_names' in checkpoint:
+#         class_names = checkpoint['class_names']
+#     else:
+#         print("ℹ Model file lacks class metadata keys. Applying hardcoded 55-class alignment array.")
+#         class_names = WARMIGRO_CLASSES
+
+#     num_classes = len(class_names)
+
+#     # Rebuild network structure
+#     model = models.resnet18(weights=None)
+#     model.fc = nn.Linear(model.fc.in_features, num_classes)
+
+#     # Extract weights dict safely
+#     if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+#         state_dict = checkpoint['model_state_dict']
+#     elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+#         state_dict = checkpoint['state_dict']
+#     else:
+#         state_dict = checkpoint
+
+#     model.load_state_dict(state_dict, strict=False)
+#     model.eval()
+#     print(f"Real weights linked! Server life-cycle successfully mapped to {num_classes} classes.")
+
+# if not os.path.exists(MODEL_PATH):
+#     print(f"Warning: Checkpoint file '{MODEL_PATH}' not found in the working directory.")
+#     print("Please make sure your model training finishes creating this file before hitting prediction routes.")
+#     class_names = []
+#     num_classes = 0
+#     model = None
+# else:
+#     print(f"Loading weights and tracking keys from '{MODEL_PATH}'...")
+#     checkpoint = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
+
+#     # Extract dynamic class array straight from training tracking data
+#     if isinstance(checkpoint, dict) and 'class_names' in checkpoint:
+#         class_names = checkpoint['class_names']
+#         num_classes = len(class_names)
+#         print(f"Success! Loaded model with {num_classes} explicit classes.")
+#     else:
+#         # Fallback check to prevent critical failures if loaded with legacy/raw state_dicts
+#         raise ValueError(
+#             "The model file exists but does not contain embedded string class mappings.\n"
+#             "Ensure your training checkpointer saves both 'model_state_dict' and 'class_names'!"
+#         )
+
+#     # Reconstruct ResNet18 Network Structural Head
+#     model = models.resnet18(weights=None)
+#     model.fc = nn.Linear(model.fc.in_features, num_classes)
+
+#     # Safely extract weights regardless of wrapper serialization format
+#     if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+#         state_dict = checkpoint['model_state_dict']
+#     elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+#         state_dict = checkpoint['state_dict']
+#     else:
+#         state_dict = checkpoint
+
+#     model.load_state_dict(state_dict)
+#     model.eval()
+#     print("Network weights loaded cleanly. Inference engine is active!")
+
+# # ==========================================
+# # 📸 IMAGE TRANSFORMS (Tensor Preprocessing)
+# # ==========================================
+# transform = transforms.Compose([
+#     transforms.Resize(256),
+#     transforms.CenterCrop(IMAGE_SIZE),
+#     transforms.ToTensor(),
+#     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+# ])
+
+# # ==========================================
+# # 🔮 INFERENCE PREDICTION PIPELINE
+# # ==========================================
+# def predict(image_bytes):
+#     if model is None:
+#         return "Model not initialized. Missing weights file.", 0.0
+
+#     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+#     tensor = transform(image).unsqueeze(0)
+
+#     with torch.no_grad():
+#         outputs = model(tensor)
+#         probabilities = torch.nn.functional.softmax(outputs, dim=1)
+#         confidence, predicted = torch.max(probabilities, 1)
+
+#         # Baseline confidence cutoff filter (15%)
+#         if confidence.item() < 0.15:
+#             return "Not a valid plant image or disease not recognized", 0.0
+
+#         disease_name = class_names[predicted.item()]
+#         return disease_name, confidence.item()
+
+# # ==========================================
+# # 🌾 ROBUST DISEASE INFO MATCHING ENGINE
+# # ==========================================
+# def get_disease_info(disease_name):
+#     """
+#     Standardizes casing, string variations, and multi-underscore anomalies 
+#     automatically to safeguard frontend responses against broken dictionary loops.
+#     """
+#     # Normalize input string (e.g., 'Tomato___Early_Blight' -> 'tomato_early_blight')
+#     clean_input = disease_name.lower().replace('___', '_').replace('__', '_').strip()
+    
+#     # 1. Look for a clean direct match in knowledge_base keys
+#     for kb_key in disease_info.keys():
+#         clean_kb_key = kb_key.lower().replace('___', '_').replace('__', '_').strip()
+#         if clean_input == clean_kb_key:
+#             return disease_info[kb_key]
+            
+#     print(f"ℹDirect match failed for '{clean_input}'. Deploying keyword fallback patterns...")
+
+#     # 2. Tokenize into individual words to locate cross-crop fallback insights
+#     crop_keywords = [
+#         "maize", "rice", "tomato", "cassava", "cashew", "cocoa", "plantain", 
+#         "yam", "sweet", "potato", "pepper", "onion", "bean", "groundnut", "leaf", "leafs"
+#     ]
+#     pred_words = [w for w in clean_input.split('_') if w not in crop_keywords and w.strip()]
+    
+#     # 3. Handle 'healthy' or empty classification fallbacks
+#     if not pred_words or "healthy" in clean_input:
+#         if "maize_healthy" in disease_info:
+#             return disease_info["maize_healthy"]
+#         for k in disease_info.keys():
+#             if "healthy" in k.lower():
+#                 return disease_info[k]
+
+#     # 4. Fallback search via symptom overlap markers (e.g., matching 'blight' or 'spot')
+#     for kb_key in disease_info.keys():
+#         clean_kb_key = kb_key.lower().replace('___', '_').replace('__', '_').strip()
+#         kb_words = [w for w in clean_kb_key.split('_') if w not in crop_keywords and w.strip()]
+        
+#         if any(word in kb_words for word in pred_words):
+#             print(f"🎯 Cross-plant metadata link matched: Mapping '{disease_name}' to '{kb_key}' metadata.")
+#             return disease_info[kb_key]
+
+#     # 5. Core Operational Safety Net Resilient Payload
+#     return {
+#         "cause": f"Suspected Plant Pathogen Profile ({disease_name})",
+#         "treatment": ["Lodge an advisory ticket with local field extension services for confirmation."],
+#         "prevention": ["Prune local canopy, clean farm tools, and segregate affected crop zone quadrants."]
+#     }
+
+# # ==========================================
+# # 🛑 ROUTING API ENDPOINTS
+# # ==========================================
+# @app.get("/")
+# def home():
+#     return {
+#         "message": "Agro Vision AI Operational Core Backend Running",
+#         "model_file": MODEL_PATH,
+#         "total_classes": num_classes,
+#         "active_classes": class_names
+#     }
+
+# @app.get("/classes")
+# def get_classes():
+#     return {"classes": class_names, "total": num_classes}
+
+# @app.post("/predict/")
+# async def predict_api(file: UploadFile = File(...)):
+#     try:
+#         contents = await file.read()
+
+#         # Archive log audit copy 
+#         file_path = os.path.join(UPLOAD_DIR, file.filename)
+#         with open(file_path, "wb") as f:
+#             f.write(contents)
+
+#         predicted_disease, confidence = predict(contents)
+#         info = get_disease_info(predicted_disease)
+
+#         return JSONResponse(content={
+#             "predicted_disease": predicted_disease,
+#             "confidence": round(confidence * 100, 2),
+#             "confidence_label": f"{confidence*100:.1f}%",
+#             "info": info
+#         })
+#     except Exception as e:
+#         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
-import uvicorn
-from PIL import Image
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+import os
 import io
 import torch
-from torchvision import transforms
-from knowledge_base import disease_info
 import torch.nn as nn
-from torchvision import models
-import os
+import uvicorn
+import gc  # 🎯 For manual garbage collection collection
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import JSONResponse
+from PIL import Image
+from torchvision import transforms, models
+from knowledge_base import disease_info
 
 app = FastAPI()
 
-# Create a directory for uploads if it doesn't exist
+# Create a directory for user upload logs if it doesn't exist
 UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# =========================
-# LOAD MODEL FROM CHECKPOINT
-# Class names and num_classes are read directly from the saved model
-# so this never breaks if you retrain with different classes
-# =========================
-# MODEL_PATH = "# Change this line:
-MODEL_PATH = "plant_symptom_model.pth"
+MODEL_PATH = "plant_disease_model.pth"
 IMAGE_SIZE = 224
 
-# checkpoint = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
-# class_names = checkpoint['class_names']
-# num_classes = len(class_names)
+WARMIGRO_CLASSES = [
+    'apple_apple_scab', 'apple_black_rot', 'apple_cedar_apple_rust', 'apple_healthy',
+    'cashew_anthracnose', 'cashew_gumosis', 'cashew_healthy', 'cashew_leaf_miner', 'cashew_red_rust',
+    'cassava_bacterial_blight', 'cassava_brown_spot', 'cassava_green_mite', 'cassava_healthy', 'cassava_mosaic',
+    'maize_cercospora_leaf_spot_gray_leaf_spot', 'maize_common_rust', 'maize_fall_armyworm', 'maize_grasshoper',
+    'maize_healthy', 'maize_leaf_beetle', 'maize_leaf_blight', 'maize_leaf_spot', 'maize_northern_leaf_blight',
+    'maize_streak_virus', 'mossaic_virus', 'pepper_bacterial_spot', 'pepper_healthy',
+    'potato_early_blight', 'potato_healthy', 'potato_late_blight', 'rice_leafs', 'southern_blight',
+    'sudden_death_syndrone', 'tomato_bacterial_spot', 'tomato_early_blight', 'tomato_healthy',
+    'tomato_late_blight', 'tomato_leaf_blight', 'tomato_leaf_curl', 'tomato_leaf_mold',
+    'tomato_mosaic_virus', 'tomato_septoria_leaf_spot', 'tomato_spider_mites_two_spotted_spider_mite',
+    'tomato_target_spot', 'tomato_tomato_mosaic_virus', 'tomato_tomato_yellow_leaf_curl_virus',
+    'tomato_tomato_yellowleaf_curl_virus', 'tomato_verticulium_wilt', 'yellow_mosaic'
+]
 
-
-checkpoint = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
-
-# Fallback block if 'class_names' key is missing from the trained dictionary
-if 'class_names' in checkpoint:
-    class_names = checkpoint['class_names']
+# ==========================================
+# 🧠 FIXED: SINGLE-PASS MODEL LIFECYCLE LOADER
+# ==========================================
+if not os.path.exists(MODEL_PATH):
+    print(f"Checkpoint '{MODEL_PATH}' not found. Booting with dummy placeholders...")
+    class_names = WARMIGRO_CLASSES
+    num_classes = len(class_names)
+    model = models.resnet18(weights=None)
+    model.fc = nn.Linear(model.fc.in_features, num_classes)
+    model.eval()
 else:
-    class_names = [
-        'Anthracnose', 'Armyworm', 'Beetle', 'Blight', 'Curl_Virus', 
-        'Grasshopper', 'Gumosis', 'Healthy', 'Leaf_Miner', 'Leaf_Spot', 
-        'Mites', 'Mosaic_Virus', 'Rust', 'Streak_Virus', 'Sudden_Death', 'Wilt'
-    ]
+    print(f"Loading weights from '{MODEL_PATH}'...")
+    checkpoint = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
 
-num_classes = len(class_names)
+    if isinstance(checkpoint, dict) and 'class_names' in checkpoint:
+        class_names = checkpoint['class_names']
+    else:
+        print("ℹ Model file lacks class metadata keys. Applying hardcoded alignment array.")
+        class_names = WARMIGRO_CLASSES
 
-print(f"Loaded model with {num_classes} classes: {class_names}")
+    num_classes = len(class_names)
 
-# model = models.resnet18(weights=None)
-# model.fc = nn.Linear(model.fc.in_features, num_classes)
-# model.load_state_dict(checkpoint['model_state_dict'])
-# model.eval()
+    # Rebuild network structure once
+    model = models.resnet18(weights=None)
+    model.fc = nn.Linear(model.fc.in_features, num_classes)
 
+    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+        state_dict = checkpoint['model_state_dict']
+    elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+        state_dict = checkpoint['state_dict']
+    else:
+        state_dict = checkpoint
 
-model = models.resnet18(weights=None)
-model.fc = nn.Linear(model.fc.in_features, num_classes)
+    model.load_state_dict(state_dict, strict=False)
+    model.eval()
+    
+    # 🎯 RAM OPTIMIZATION: Wipe checkpoint dictionary records from memory immediately after extraction
+    del checkpoint
+    del state_dict
+    gc.collect()
+    print(f"Real weights linked! Server lifecycle successfully mapped to {num_classes} classes.")
 
-# Extract weights correctly whether wrapped in a key or saved raw
-if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
-    state_dict = checkpoint['model_state_dict']
-elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-    state_dict = checkpoint['state_dict']
-else:
-    # If the file IS the raw state dict itself
-    state_dict = checkpoint
-
-model.load_state_dict(state_dict)
-model.eval()
-
-# =========================
-# IMAGE TRANSFORMS
-# =========================
+# ==========================================
+# 📸 IMAGE TRANSFORMS (Tensor Preprocessing)
+# ==========================================
 transform = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(IMAGE_SIZE),
@@ -80,10 +327,13 @@ transform = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-# =========================
-# PREDICT
-# =========================
+# ==========================================
+# 🔮 INFERENCE PREDICTION PIPELINE
+# ==========================================
 def predict(image_bytes):
+    if model is None:
+        return "Model not initialized. Missing weights file.", 0.0
+
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     tensor = transform(image).unsqueeze(0)
 
@@ -92,68 +342,61 @@ def predict(image_bytes):
         probabilities = torch.nn.functional.softmax(outputs, dim=1)
         confidence, predicted = torch.max(probabilities, 1)
 
+        # Free up input processing allocation footprints right away
+        del tensor
         if confidence.item() < 0.15:
-            return "Not a valid plant image or disease not recognised", 0.0
+            return "Not a valid plant image or disease not recognized", 0.0
 
         disease_name = class_names[predicted.item()]
         return disease_name, confidence.item()
 
-# =========================
-# GET DISEASE INFO
-# =========================
-
-# =========================
-# GET DISEASE INFO (ROBUST CROSS-PLANT FALLBACK)
-# =========================
+# ==========================================
+# 🌾 ROBUST DISEASE INFO MATCHING ENGINE
+# ==========================================
 def get_disease_info(disease_name):
-    # 1. Try the exact match first (keeps everything working normally)
-    key = disease_name.lower().replace(' ', '_')
-    if key in disease_info:
-        return disease_info[key]
-        
-    print(f"Exact match failed for '{key}'. Running cross-plant fallback...")
-
-    # 2. If exact match fails (e.g. model guessed "rice leafs" but it's not a key),
-    # extract the core symptoms to find a match from another plant.
-    plant_keywords = ["maize", "rice", "tomato", "cassava", "cashew", "leaf", "leafs", "___", "__", "_"]
+    clean_input = disease_name.lower().replace('___', '_').replace('__', '_').strip()
     
-    # Clean the predicted name into clean, individual words
-    pred_clean = disease_name.lower().replace('___', ' ').replace('__', ' ').replace('_', ' ')
-    pred_words = [w for w in pred_clean.split() if w not in plant_keywords]
+    for kb_key in disease_info.keys():
+        clean_kb_key = kb_key.lower().replace('___', '_').replace('__', '_').strip()
+        if clean_input == clean_kb_key:
+            return disease_info[kb_key]
+            
+    crop_keywords = [
+        "maize", "rice", "tomato", "cassava", "cashew", "cocoa", "plantain", 
+        "yam", "sweet", "potato", "pepper", "onion", "bean", "groundnut", "leaf", "leafs"
+    ]
+    pred_words = [w for w in clean_input.split('_') if w not in crop_keywords and w.strip()]
     
-    # Handle the "healthy" or empty edge case
-    if not pred_words or "healthy" in pred_clean:
-        # If it predicted a healthy version of the wrong plant, give them maize_healthy as the baseline
+    if not pred_words or "healthy" in clean_input:
         if "maize_healthy" in disease_info:
             return disease_info["maize_healthy"]
-        # Fallback to any healthy key available
         for k in disease_info.keys():
-            if "healthy" in k:
+            if "healthy" in k.lower():
                 return disease_info[k]
 
-    # 3. Look through the dictionary for a matching symptom (e.g., matching "blight" or "spot")
-    for key_candidate in disease_info.keys():
-        key_clean = key_candidate.lower().replace('___', ' ').replace('__', ' ').replace('_', ' ')
-        key_words = [w for w in key_clean.split() if w not in plant_keywords]
+    for kb_key in disease_info.keys():
+        clean_kb_key = kb_key.lower().replace('___', '_').replace('__', '_').strip()
+        kb_words = [w for w in clean_kb_key.split('_') if w not in crop_keywords and w.strip()]
         
-        # If the symptom words overlap, borrow the treatment info from that plant
-        if any(word in key_words for word in pred_words):
-            print(f"Cross-plant match found! Using info from '{key_candidate}' for prediction '{disease_name}'")
-            return disease_info[key_candidate]
+        if any(word in kb_words for word in pred_words):
+            return disease_info[kb_key]
 
-    # 4. Final safety net if absolutely nothing matches
-    return "Disease information not found."
+    return {
+        "cause": f"Suspected Plant Pathogen Profile ({disease_name})",
+        "treatment": ["Lodge an advisory ticket with local field extension services for confirmation."],
+        "prevention": ["Prune local canopy, clean farm tools, and segregate affected crop zone quadrants."]
+    }
 
-# =========================
-# ROUTES
-# =========================
+# ==========================================
+# 🛑 ROUTING API ENDPOINTS
+# ==========================================
 @app.get("/")
 def home():
     return {
-        "message": "Agro AI API running",
-        "model": MODEL_PATH,
-        "num_classes": num_classes,
-        "classes": class_names
+        "message": "Agro Vision AI Operational Core Backend Running",
+        "model_file": MODEL_PATH,
+        "total_classes": num_classes,
+        "active_classes": class_names
     }
 
 @app.get("/classes")
@@ -165,11 +408,7 @@ async def predict_api(file: UploadFile = File(...)):
     try:
         contents = await file.read()
 
-        # Save uploaded file
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
-        with open(file_path, "wb") as f:
-            f.write(contents)
-
+        # Execute predictions
         predicted_disease, confidence = predict(contents)
         info = get_disease_info(predicted_disease)
 
@@ -181,7 +420,11 @@ async def predict_api(file: UploadFile = File(...)):
         })
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
-
+    finally:
+        # 🎯 AGGRESSIVE POST-INFERENCE MEMORY FLUSH
+        if 'contents' in locals(): 
+            del contents
+        gc.collect()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

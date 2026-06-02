@@ -8,3 +8,4 @@ for p in sorted(base.rglob("*")):
         img_count = len(list(p.glob("*.jpg")) + list(p.glob("*.png")) + list(p.glob("*.jpeg")))
         if img_count > 0:
             print(f"  {p}  -->  {img_count} images")
+            print(f"    Sample image: {next(p.glob('*.jpg'), next(p.glob('*.png'), next(p.glob('*.jpeg'), 'No images found')))}")

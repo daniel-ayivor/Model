@@ -25,12 +25,12 @@ def aggressive_dataset_cleaner(root_dir):
                         img.load() 
                         
                 except (IOError, SyntaxError, OSError, Exception) as e:
-                    print(f"❌ Removing corrupted/broken stream image: {file_path}")
+                    print(f"Removing corrupted/broken stream image: {file_path}")
                     try:
                         os.remove(file_path)
                         purged_count += 1
                     except Exception as deletion_error:
-                        print(f"   Could not delete file: {deletion_error}")
+                        print(f"Could not delete file: {deletion_error}")
 
     print(f"\n--- Purge complete! Safely dropped {purged_count} broken files. ---")
 
