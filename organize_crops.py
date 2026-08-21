@@ -65,10 +65,10 @@ def organize_dataset():
         "Tomato___Tomato_Yellow_Leaf_Curl_Virus": "Tomato",
 
         # General/Ambiguous - you might need to sort these manually
-        "Mossaic Virus": "Tomato", # Assuming Tomato, adjust if needed
-        "Southern blight": "Tomato", # Assuming Tomato, adjust if needed
-        "Sudden Death Syndrone": "Tomato", # Assuming Tomato, adjust if needed
-        "Yellow Mosaic": "Tomato" # Assuming Tomato, adjust if needed
+        "Mossaic Virus": "Tomato", 
+        "Southern blight": "Tomato",
+        "Sudden Death Syndrone": "Tomato", 
+        "Yellow Mosaic": "Tomato" 
     }
 
     for source_parent in [source_dir_train, source_dir_validation]:
