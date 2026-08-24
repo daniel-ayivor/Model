@@ -18,8 +18,11 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 # ==================================================
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {DEVICE}")
+if DEVICE == "cuda":
+    print(f"GPU Model: {torch.cuda.get_device_name(0)}")
+print(f"Using device: {DEVICE}")
 
-TRAIN_DIR = "./plant_datasets/processed/train"
+TRAIN_DIR = "./plant_datasets/processed/train_cleaned"
 VAL_DIR = "./plant_datasets/processed/validation"
 
 IMAGE_SIZE = 224
@@ -55,7 +58,7 @@ for target_dir in [TRAIN_DIR, VAL_DIR]:
                 with Image.open(file_path) as img:
                     img.verify()  
             except Exception:
-                print(f"⚠️ Removing corrupted image header: {file}")
+                print(f"Removing corrupted image header: {file}")
                 try:
                     os.remove(file_path)
                     corrupt_count += 1
